@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+backend/medical-chatbot/venv/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Database & Embeddings
+*.pkl
+*.index
+chunks_output.txt
+medical_db_docs.pkl
+medical_db.index
+
+# Environment
+.env
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# Flutter
+frontend/.dart_tool/
+frontend/build/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/pubspec.lock
+
+# Logs
+*.log
+
+# Large files - PDFs
+*.pdf
+Medical_book.pdf
