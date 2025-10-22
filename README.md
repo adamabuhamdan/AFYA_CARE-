@@ -1,3 +1,7 @@
+<img width="1920" height="1080" alt="Untitled design" src="https://github.com/user-attachments/assets/f3976411-0a98-40d8-a132-1242280182c3" />
+
+
+
 # 🌟 AfyaCare: مساعدك الصحي الذكي المتكامل 🌟
 
 ## 💡 نظرة عامة على المشروع
