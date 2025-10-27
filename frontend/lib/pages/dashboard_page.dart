@@ -5,7 +5,6 @@ import '../widgets/gradient_button.dart';
 import 'add_medication_page.dart';
 import 'chat_page.dart';
 import '../models/medication.dart';
-import '../models/chat_message.dart';
 import '../services/api_service.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -16,7 +15,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class DashboardPageState extends State<DashboardPage> {
-  List<Medication> _medications = [];
+  final List<Medication> _medications = [];
 
   // أسئلة تقرير نهاية اليوم مع حقول نصية
   final List<DailyQuestion> _dailyReportQuestions = [
@@ -65,7 +64,7 @@ class DashboardPageState extends State<DashboardPage> {
     ),
   ];
 
-  Map<String, String> _dailyReportAnswers = {};
+  final Map<String, String> _dailyReportAnswers = {};
   final Map<String, TextEditingController> _controllers = {};
   String _dailySummary = 'لم يتم إرسال تقرير اليوم بعد.';
   bool _reportSubmittedToday = false;
@@ -190,42 +189,38 @@ class DashboardPageState extends State<DashboardPage> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          ..._medications
-                              .map(
-                                (med) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
+                          ..._medications.map(
+                            (med) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    med.isTaken
+                                        ? Icons.check_circle
+                                        : Icons.radio_button_unchecked,
+                                    color: med.isTaken
+                                        ? Colors.green
+                                        : Colors.grey,
+                                    size: 20,
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        med.isTaken
-                                            ? Icons.check_circle
-                                            : Icons.radio_button_unchecked,
-                                        color: med.isTaken
-                                            ? Colors.green
-                                            : Colors.grey,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          med.name,
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      ),
-                                      Text(
-                                        med.time.format(context),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppTheme.textSecondary,
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      med.name,
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
                                   ),
-                                ),
-                              )
-                              .toList(),
+                                  Text(
+                                    med.time.format(context),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -306,7 +301,7 @@ class DashboardPageState extends State<DashboardPage> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),
@@ -354,7 +349,7 @@ class DashboardPageState extends State<DashboardPage> {
         if (!_dailyReportAnswers.containsKey(question.key) ||
             _dailyReportAnswers[question.key]!.isEmpty) {
           hasEssentialAnswers = false;
-          missingFields.add(question.question.substring(0, 30) + '...');
+          missingFields.add('${question.question.substring(0, 30)}...');
         }
       }
     }
@@ -688,30 +683,60 @@ class DashboardPageState extends State<DashboardPage> {
     final nextMedication = _getNextMedication();
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('AFYA CARE - لوحة التحكم'),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: AppTheme.appGradient),
+        ),
+        elevation: 4,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            onPressed: () {
+              // الانتقال للإشعارات
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'صباح الخير، آدم',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    nextMedication != null
-                        ? 'الجرعة التالية: ${nextMedication.name} الساعة ${nextMedication.time.format(context)}'
-                        : 'لا توجد جرعات قادمة',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+              // ترحيب مختصر بعد إضافة AppBar
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'مرحباً آدم 👋',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      nextMedication != null
+                          ? 'الجرعة التالية: ${nextMedication.name} الساعة ${nextMedication.time.format(context)}'
+                          : 'لا توجد جرعات قادمة',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
 
               // Today's Medications Card
               Expanded(
@@ -843,7 +868,7 @@ class DashboardPageState extends State<DashboardPage> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Scrollbar(
-                                thumbVisibility: true,
+                                thumbVisibility: false,
                                 child: SingleChildScrollView(
                                   child: Column(
                                     crossAxisAlignment:
@@ -1001,7 +1026,7 @@ class DashboardPageState extends State<DashboardPage> {
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: AppTheme.darkTurquoise,
+                      gradient: AppTheme.appGradient,
                       borderRadius: BorderRadius.circular(32),
                     ),
                     child: Material(

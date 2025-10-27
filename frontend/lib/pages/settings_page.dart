@@ -16,8 +16,11 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('الإعدادات'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: AppTheme.appGradient),
+        ),
+        elevation: 4,
+        foregroundColor: Colors.white,
       ),
       body: SafeArea(
         child: Padding(
@@ -76,7 +79,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: AppTheme.darkTurquoise,
+                  color: AppTheme.textSecondary,
                   borderRadius: BorderRadius.circular(32),
                 ),
                 child: Material(

@@ -60,8 +60,11 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('إضافة دواء جديد'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: AppTheme.appGradient),
+        ),
+        elevation: 4,
+        foregroundColor: Colors.white,
       ),
       body: SafeArea(
         child: SingleChildScrollView(

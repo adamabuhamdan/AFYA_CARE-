@@ -1,16 +1,32 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color background = Color.fromRGBO(201, 202, 255, 1);
-  static const Color primary = Color.fromARGB(255, 4, 0, 216);
+  static const Color background = Color.fromARGB(255, 255, 224, 239);
+  static const Color primary = Color.fromARGB(255, 3, 0, 163);
   static const Color accent = Color.fromRGBO(184, 185, 255, 1);
-  static const Color darkTurquoise = Color.fromARGB(255, 255, 173, 214);
+  static const Color darkTurquoise = Color(0xFFFFADD6);
   static const Color textPrimary = Color.fromRGBO(0, 28, 61, 1);
   static const Color textSecondary = Color.fromRGBO(2, 0, 90, 1);
   // إضافة التدرج اللوني  Color.fromARGB(255, 255, 173, 214);
   static Gradient get primaryGradient {
     return const LinearGradient(
       colors: [primary, darkTurquoise],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    );
+  }
+
+  static Gradient get appGradient {
+    return const LinearGradient(
+      colors: [darkTurquoise, primary],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    );
+  }
+
+  static Gradient get secondaryGradient {
+    return const LinearGradient(
+      colors: [primary, accent],
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
     );
@@ -65,7 +81,7 @@ class AppTheme {
 
   static BoxDecoration get glassCard {
     return BoxDecoration(
-      color: Colors.white.withOpacity(0.9),
+      color: const Color.fromARGB(255, 255, 255, 255).withOpacity(0.9),
       borderRadius: BorderRadius.circular(32),
       boxShadow: [
         BoxShadow(

@@ -14,7 +14,7 @@ dependencies:
     sdk: flutter
   intl: ^0.20.2
   cupertino_icons: ^1.0.8
-  http: ^0.13.5
+  http: ^1.5.0  # تحديث هذا السطر
 
 dev_dependencies:
   flutter_test:

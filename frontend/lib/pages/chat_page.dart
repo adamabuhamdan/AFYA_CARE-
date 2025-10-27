@@ -280,12 +280,15 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('AFYA CARE - المساعد الصحي 🤖'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: AppTheme.appGradient),
+        ),
+        elevation: 4,
+        foregroundColor: Colors.white,
         actions: [
           if (_questionnaireCompleted)
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh, color: Colors.white),
               onPressed: () {
                 _showResetDialog();
               },
@@ -358,19 +361,13 @@ class _ChatPageState extends State<ChatPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'AFYA CARE - المساعد الصحي الذكي 🤖',
+              'اختر حالتك الصحية للحصول على المساعدة المناسبة:',
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                 color: AppTheme.primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'اختر حالتك الصحية للحصول على المساعدة المناسبة:',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
-            ),
+
             const SizedBox(height: 32),
 
             // زر للمستخدمين تحت العلاج
