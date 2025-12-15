@@ -884,8 +884,27 @@ async def suggest_medication_schedule(request: MedicationScheduleRequest):
         )
     
     try:
+        # طباعة البيانات الواردة من Frontend
+        logger.info(f"📋 بيانات الواردة من Frontend:")
+        logger.info(f"📦 الأدوية: {request.medications}")
+        logger.info(f"🕒 وقت النوم: {request.sleep_time}")
+        logger.info(f"⏰ وقت الاستيقاظ: {request.wake_up_time}")
+        if request.user_preferences:
+            logger.info(f"🎯 التفضيلات: {request.user_preferences}")
+        else:
+            logger.info(f"🎯 لا توجد تفضيلات")
+        
         # بناء قائمة الأدوية
         medications_list = "\n".join([f"• {med}" for med in request.medications])
+        
+        # تحويل user_preferences من dict إلى string
+        preferences_text = ""
+        if request.user_preferences:
+            preferences_text = "**تفضيلات إضافية:**\n"
+            for key, value in request.user_preferences.items():
+                preferences_text += f"• {key}: {value}\n"
+        else:
+            preferences_text = "لا توجد تفضيلات إضافية"
         
         # إعداد رسالة الذكاء الاصطناعي
         messages = [
@@ -921,12 +940,16 @@ async def suggest_medication_schedule(request: MedicationScheduleRequest):
 💊 الأدوية المطلوبة:
 {medications_list}
 
-{'**تفضيلات إضافية:** ' + request.user_preferences if request.user_preferences else 'لا توجد تفضيلات إضافية'}
+{preferences_text}
 
 **الطلب:**
 اقترح جدولاً مثالياً لمواعيد تناول هذه الأدوية مع شرح موجز لكل توقيت."""
             }
         ]
+        
+        # طباعة رسالة الذكاء الاصطناعي المرسلة (للتتبع)
+        logger.info("📤 رسالة الذكاء الاصطناعي المرسلة:")
+        logger.info(json.dumps(messages, ensure_ascii=False, indent=2))
         
         # استدعاء OpenRouter API
         api_start = time.time()
@@ -973,6 +996,10 @@ async def suggest_medication_schedule(request: MedicationScheduleRequest):
             
             ai_response = response_data["choices"][0]["message"]["content"]
             
+            # طباعة استجابة الذكاء الاصطناعي
+            logger.info("📥 استجابة الذكاء الاصطناعي:")
+            logger.info(f"📝 {ai_response[:500]}...")  # طباعة أول 500 حرف فقط
+            
         except requests.exceptions.Timeout:
             logger.error("⏰ انتهت مهلة الاتصال بـ OpenRouter API")
             raise HTTPException(status_code=504, detail="انتهت مهلة الاتصال بخدمة الذكاء الاصطناعي")
@@ -983,6 +1010,15 @@ async def suggest_medication_schedule(request: MedicationScheduleRequest):
         total_time = time.time() - start_time
         
         logger.info(f"✅ تم إنشاء اقتراح الجدولة في {total_time:.2f} ثانية")
+        
+        # طباعة الرد النهائي الذي سيرسل للـ Frontend
+        logger.info("📨 الرد المرسل للـ Frontend:")
+        final_response = {
+            "suggested_schedule": ai_response,
+            "explanation": "تم إنشاء الاقتراح بناءً على معلوماتك والأسس الطبية العامة",
+            "processing_time": total_time
+        }
+        logger.info(json.dumps(final_response, ensure_ascii=False, indent=2))
         
         return MedicationScheduleResponse(
             suggested_schedule=ai_response,
@@ -998,7 +1034,6 @@ async def suggest_medication_schedule(request: MedicationScheduleRequest):
             status_code=500, 
             detail=f"خطأ داخلي في المعالجة: {str(e)}"
         )
-
 
 @app.get("/health")
 async def health():
