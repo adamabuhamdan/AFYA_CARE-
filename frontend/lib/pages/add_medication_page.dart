@@ -3,6 +3,7 @@ import '../models/medication.dart';
 import '../app/theme.dart';
 import '../widgets/gradient_button.dart';
 import '../services/api_service.dart';
+import 'package:flutter/cupertino.dart';
 
 class AddMedicationPage extends StatefulWidget {
   final Function(Medication) onMedicationAdded;
@@ -19,7 +20,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   final List<String> _medicationsList = [];
 
-  // متغيرات جديدة للاقتراح
+  // متغيرات الاقتراح
   bool _showSuggestion = false;
   String _aiSuggestion = '';
 
@@ -68,8 +69,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          // أضف هذا
-          physics: const BouncingScrollPhysics(), // لإضافة تأثير جميل للتمرير
+          physics: const BouncingScrollPhysics(),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Form(
@@ -106,7 +106,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               child: const Icon(
-                                Icons.psychology,
+                                Icons.add, // تم تغيير الأيقونة لـ + لتكون أوضح
                                 color: Colors.white,
                               ),
                             ),
@@ -117,7 +117,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Medications List
+                  // Medications List (Chips)
                   if (_medicationsList.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -186,63 +186,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                     ),
                   const SizedBox(height: 20),
 
-                  // Time Picker
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: AppTheme.glassCard,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'وقت التذكير',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () async {
-                              final TimeOfDay? pickedTime =
-                                  await showTimePicker(
-                                    context: context,
-                                    initialTime: _selectedTime,
-                                  );
-                              if (pickedTime != null) {
-                                setState(() {
-                                  _selectedTime = pickedTime;
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.access_time,
-                                    color: AppTheme.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _selectedTime.format(context),
-                                    style: TextStyle(
-                                      color: AppTheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  // Time Picker & Day Selector
+                  MedicationReminderWidget(
+                    onDataChanged: (time, days) {
+                      setState(() {
+                        _selectedTime = time;
+                      });
+                    },
                   ),
                   const SizedBox(height: 20),
 
@@ -299,7 +249,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
                   const SizedBox(height: 20),
 
-                  // AI Suggestion Result Box - يظهر فقط عندما يكون هناك اقتراح
+                  // AI Suggestion Result Box
                   if (_showSuggestion && _aiSuggestion.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -370,7 +320,6 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                                 child: GradientButton(
                                   text: 'استخدام هذا الاقتراح',
                                   onPressed: () {
-                                    // هنا يمكنك إضافة منطق لاستخدام الاقتراح
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text('تم تطبيق الاقتراح'),
@@ -385,34 +334,48 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                       ),
                     ),
 
-                  // إزالة Spacer وإضافة مسافة ثابتة
                   const SizedBox(height: 20),
 
-                  // Add Medication Button
+                  // ==============================
+                  // زر إضافة الدواء (تم التعديل هنا)
+                  // ==============================
                   GradientButton(
                     text: 'إضافة الدواء',
                     onPressed: () {
-                      if (_formKey.currentState!.validate() &&
-                          _nameController.text.isNotEmpty) {
-                        final medication = Medication(
-                          id: DateTime.now().millisecondsSinceEpoch.toString(),
-                          name: _nameController.text,
-                          time: _selectedTime,
-                        );
-
-                        widget.onMedicationAdded(medication);
-                        Navigator.pop(context);
-                      } else {
+                      // 1. إذا كان القائمة فارغة و مربع النص فارغ، أظهر خطأ
+                      if (_medicationsList.isEmpty &&
+                          _nameController.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('يرجى إدخال اسم الدواء'),
                           ),
                         );
+                        return;
                       }
+
+                      // 2. إذا كتب نص ونسي يضيفه، نضيفه نحن
+                      if (_nameController.text.isNotEmpty) {
+                        _medicationsList.add(_nameController.text);
+                      }
+
+                      // 3. نقوم بحفظ كل الأدوية الموجودة في القائمة
+                      // نقوم بعمل حلقة تكرار لإضافة كل دواء في القائمة
+                      for (var medName in _medicationsList) {
+                        final medication = Medication(
+                          // نستخدم اسم الدواء كجزء من المعرف لضمان الاختلاف
+                          id: "${DateTime.now().millisecondsSinceEpoch}_$medName",
+                          name: medName,
+                          time: _selectedTime,
+                        );
+                        widget.onMedicationAdded(medication);
+                      }
+
+                      // 4. نغلق الصفحة
+                      Navigator.pop(context);
                     },
                   ),
 
-                  const SizedBox(height: 20), // مسافة إضافية في الأسفل
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -428,6 +391,10 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     super.dispose();
   }
 }
+
+// ==========================================================
+// بقية الكلاسات كما هي (AISuggestionDialog و MedicationReminderWidget)
+// ==========================================================
 
 class AISuggestionDialog extends StatefulWidget {
   final List<String> medicationsList;
@@ -661,6 +628,331 @@ class _AISuggestionDialogState extends State<AISuggestionDialog> {
                   ? 'جاري إنشاء الاقتراح...'
                   : 'الحصول على الاقتراح',
               onPressed: _isLoading ? null : _getAISuggestion,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MedicationReminderWidget extends StatefulWidget {
+  final Function(TimeOfDay, List<bool>) onDataChanged;
+
+  const MedicationReminderWidget({Key? key, required this.onDataChanged})
+    : super(key: key);
+
+  @override
+  _MedicationReminderWidgetState createState() =>
+      _MedicationReminderWidgetState();
+}
+
+class _MedicationReminderWidgetState extends State<MedicationReminderWidget> {
+  TimeOfDay _selectedTime = TimeOfDay.now();
+  final List<bool> _selectedDays = List.filled(7, true);
+
+  final List<String> _fullDayNames = [
+    'السبت',
+    'الأحد',
+    'الاثنين',
+    'الثلاثاء',
+    'الأربعاء',
+    'الخميس',
+    'الجمعة',
+  ];
+
+  void _pickTime() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        return Container(
+          height: 300,
+          padding: const EdgeInsets.only(top: 20),
+          child: Column(
+            children: [
+              Text(
+                "اختر وقت الجرعة",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: CupertinoTheme(
+                  data: CupertinoThemeData(
+                    textTheme: CupertinoTextThemeData(
+                      dateTimePickerTextStyle: TextStyle(
+                        fontSize: 22,
+                        color: Colors.black87,
+                        fontFamily: Theme.of(
+                          context,
+                        ).textTheme.bodyLarge?.fontFamily,
+                      ),
+                    ),
+                  ),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.time,
+                    initialDateTime: DateTime(
+                      2023,
+                      1,
+                      1,
+                      _selectedTime.hour,
+                      _selectedTime.minute,
+                    ),
+                    use24hFormat: false,
+                    onDateTimeChanged: (DateTime newTime) {
+                      setState(() {
+                        _selectedTime = TimeOfDay.fromDateTime(newTime);
+                      });
+                      widget.onDataChanged(_selectedTime, _selectedDays);
+                    },
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(15),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF4A80F0), Color(0xFF9C27B0)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        "تأكيد الوقت",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openDaySelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              padding: const EdgeInsets.all(25),
+              height: 500,
+              child: Column(
+                children: [
+                  const Text(
+                    "تكرار الأيام",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 15),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: _fullDayNames.length,
+                      separatorBuilder: (c, i) =>
+                          const Divider(height: 1, color: Color(0xFFF0F0F0)),
+                      itemBuilder: (context, index) {
+                        return CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            _fullDayNames[index],
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          value: _selectedDays[index],
+                          activeColor: const Color(0xFF4A80F0),
+                          checkboxShape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          onChanged: (val) {
+                            setSheetState(
+                              () => _selectedDays[index] = val ?? false,
+                            );
+                            setState(() {});
+                            widget.onDataChanged(_selectedTime, _selectedDays);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(15),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4A80F0), Color(0xFF9C27B0)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          "حفظ الاختيار",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    final timeString = localizations.formatTimeOfDay(
+      _selectedTime,
+      alwaysUse24HourFormat: false,
+    );
+
+    int count = _selectedDays.where((d) => d).length;
+    String daysString = count == 7 ? "يومياً" : "$count أيام محددة";
+    if (count == 0) daysString = "مرة واحدة فقط";
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4A80F0).withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildSettingsRow(
+            icon: Icons.access_time_filled_rounded,
+            title: "وقت الجرعة",
+            value: timeString,
+            isGradientIcon: true,
+            onTap: _pickTime,
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 60),
+            child: Divider(height: 1, color: Colors.grey[200]),
+          ),
+
+          _buildSettingsRow(
+            icon: Icons.calendar_month_rounded,
+            title: "تكرار التذكير",
+            value: daysString,
+            isGradientIcon: true,
+            onTap: _openDaySelector,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    required bool isGradientIcon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4A80F0).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: ShaderMask(
+                shaderCallback: (Rect bounds) {
+                  return const LinearGradient(
+                    colors: [Color(0xFF4A80F0), Color(0xFF9C27B0)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ).createShader(bounds);
+                },
+                child: Icon(icon, color: Colors.white, size: 24),
+              ),
+            ),
+            const SizedBox(width: 15),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F7FA),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF4A80F0),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 12,
+                    color: Colors.grey[400],
+                  ),
+                ],
+              ),
             ),
           ],
         ),

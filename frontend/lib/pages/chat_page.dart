@@ -26,77 +26,42 @@ class _ChatPageState extends State<ChatPage> {
 
   // أسئلة تقرير نهاية اليوم لمتابعة الأدوية
   final List<Questionnaire> _treatmentQuestions = [
+    // السؤال 1: الالتزام
     Questionnaire(
       question: 'هل تناولت جميع أدويتك اليوم حسب الجدول؟',
-      options: [
-        'نعم، جميع الأدوية',
-        'معظم الأدوية',
-        'بعض الأدوية فقط',
-        'لم أتناول أي دواء',
-      ],
+      options: ['نعم', 'لا'],
       key: 'adherence',
     ),
+
+    // السؤال 2 (الأصل 3): السبب
+    // المنطق: يظهر فقط إذا كانت إجابة السؤال 1 هي "لا"
+    // التعديل: تم تغيير الصيغة لتناسب نعم/لا
     Questionnaire(
-      question: 'ما هي الأدوية التي لم تتناولها؟',
-      options: [
-        'تناولت جميع الأدوية',
-        'نسيت جرعة الصباح',
-        'نسيت جرعة المساء',
-        'نسيت جرعة الظهيرة',
-        'لم أتناول أي دواء',
-      ],
-      key: 'missed_medications',
-    ),
-    Questionnaire(
-      question: 'ما هو سبب عدم تناول الدواء؟',
-      options: [
-        'تناولت جميع الأدوية',
-        'نسيت الموعد',
-        'شعرت بتحسن',
-        'أعراض جانبية',
-        'انتهى الدواء',
-        'أسباب أخرى',
-      ],
+      question: 'هل كان سبب عدم تناول الدواء هو النسيان؟',
+      options: ['نعم', 'لا'],
       key: 'reason',
     ),
+
+    // السؤال 3 (الأصل 4): الأعراض الجانبية
     Questionnaire(
       question: 'هل واجهت أي أعراض جانبية اليوم؟',
-      options: [
-        'لا توجد أعراض',
-        'غثيان أو قيء',
-        'دوخة أو دوار',
-        'صداع',
-        'ألم في المعدة',
-        'طفح جلدي',
-        'أعراض أخرى',
-      ],
+      options: ['نعم', 'لا'],
       key: 'side_effects',
     ),
+
+    // السؤال 4 (الأصل 5): شدة الأعراض
+    // المنطق: يظهر فقط إذا كانت إجابة السؤال 3 هي "نعم"
+    // التعديل: تم تغيير الصيغة لتناسب نعم/لا
     Questionnaire(
-      question: 'ما هي شدة الأعراض التي شعرت بها؟',
-      options: [
-        'لا توجد أعراض',
-        'خفيفة (لا تؤثر على النشاط)',
-        'متوسطة (تؤثر قليلاً على النشاط)',
-        'شديدة (تعيق النشاط اليومي)',
-      ],
+      question: 'هل كانت الأعراض شديدة وتؤثر على نشاطك اليومي؟',
+      options: ['نعم', 'لا'],
       key: 'symptom_severity',
     ),
+
     Questionnaire(
-      question: 'كيف كان شعورك العام اليوم؟',
-      options: ['ممتاز', 'جيد', 'متوسط', 'سيء', 'سيء جداً'],
+      question: 'هل تشعر بتحسن عام في صحتك اليوم؟',
+      options: ['نعم', 'لا'],
       key: 'general_feeling',
-    ),
-    Questionnaire(
-      question: 'هل هناك أي ملاحظات تريد إضافتها؟',
-      options: [
-        'لا توجد ملاحظات',
-        'تحسنت الأعراض',
-        'ساءت الأعراض',
-        'أحتاج استشارة طبية',
-        'أحتاج تغيير الدواء',
-      ],
-      key: 'notes',
     ),
   ];
 
@@ -122,11 +87,7 @@ class _ChatPageState extends State<ChatPage> {
       options: ['لا أدخن ولا أشرب', 'أدخن فقط', 'أشرب فقط', 'كلاهما'],
       key: 'habits',
     ),
-    Questionnaire(
-      question: 'ما هو مستوى التوتر في حياتك؟',
-      options: ['منخفض', 'متوسط', 'مرتفع', 'مرتفع جداً'],
-      key: 'stress',
-    ),
+
     Questionnaire(
       question: 'هل لديك تاريخ عائلي لأمراض مزمنة؟',
       options: ['لا', 'سكري', 'ضغط', 'قلب', 'سرطان'],
@@ -484,6 +445,31 @@ class _ChatPageState extends State<ChatPage> {
         .length;
     final totalQuestions = _currentQuestions.length;
 
+    List<Map<String, dynamic>> visibleItems = [];
+
+    for (int i = 0; i < _currentQuestions.length; i++) {
+      final question = _currentQuestions[i];
+      bool isVisible = true;
+
+      if (question.key == 'reason') {
+        final adherenceQ = _currentQuestions.firstWhere(
+          (q) => q.key == 'adherence',
+        );
+        if (adherenceQ.selectedAnswer != 'لا') isVisible = false;
+      }
+
+      if (question.key == 'symptom_severity') {
+        final sideEffectsQ = _currentQuestions.firstWhere(
+          (q) => q.key == 'side_effects',
+        );
+        if (sideEffectsQ.selectedAnswer != 'نعم') isVisible = false;
+      }
+
+      if (isVisible) {
+        visibleItems.add({'question': question, 'originalIndex': i});
+      }
+    }
+
     return Expanded(
       child: Column(
         children: [
@@ -519,20 +505,30 @@ class _ChatPageState extends State<ChatPage> {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(20),
-              itemCount: _currentQuestions.length,
+              // نستخدم طول القائمة الظاهرة فقط
+              itemCount: visibleItems.length,
               itemBuilder: (context, index) {
+                // استخراج البيانات من القائمة الجديدة
+                final item = visibleItems[index];
+                final question = item['question'] as Questionnaire;
+                final originalIndex = item['originalIndex'] as int;
+
                 return QuestionnaireCard(
-                  questionnaire: _currentQuestions[index],
+                  questionnaire: question,
+
+                  // التريك هنا: نمرر الـ index الجديد (0, 1, 2) ليظهر (1, 2, 3)
                   index: index,
+
                   onAnswerSelected: (answer) {
-                    _answerQuestion(index, answer);
+                    // عند الحفظ، نستخدم الـ originalIndex عشان نحفظ في المكان الصح
+                    _answerQuestion(originalIndex, answer);
                   },
                 );
               },
             ),
           ),
 
-          // Bottom Buttons
+          // Bottom Buttons (نفس كودك السابق)
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(

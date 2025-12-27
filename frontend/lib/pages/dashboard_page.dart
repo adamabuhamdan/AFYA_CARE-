@@ -17,55 +17,7 @@ class DashboardPage extends StatefulWidget {
 class DashboardPageState extends State<DashboardPage> {
   final List<Medication> _medications = [];
 
-  // أسئلة تقرير نهاية اليوم مع حقول نصية
-  final List<DailyQuestion> _dailyReportQuestions = [
-    DailyQuestion(
-      question: 'هل تناولت جميع أدويتك اليوم حسب الجدول؟',
-      hint: 'مثال: نعم جميع الأدوية / معظم الأدوية / لم أتناول بعضها',
-      key: 'adherence',
-      isRequired: true,
-    ),
-    DailyQuestion(
-      question: 'ما هي الأدوية التي لم تتناولها (إن وجدت)؟',
-      hint: 'مثال: نسيت جرعة الصباح / تناولت جميع الأدوية',
-      key: 'missed_meds',
-      isRequired: false,
-    ),
-    DailyQuestion(
-      question: 'ما هو سبب عدم تناول الدواء (إن وجد)؟',
-      hint: 'مثال: نسيت الموعد / شعرت بتحسن / أعراض جانبية',
-      key: 'reason',
-      isRequired: false,
-    ),
-    DailyQuestion(
-      question: 'هل واجهت أي أعراض جانبية اليوم؟',
-      hint: 'مثال: لا توجد أعراض / غثيان خفيف / صداع',
-      key: 'side_effects',
-      isRequired: false,
-    ),
-    DailyQuestion(
-      question: 'ما هي شدة الأعراض التي شعرت بها؟',
-      hint: 'مثال: لا توجد أعراض / خفيفة / متوسطة / شديدة',
-      key: 'symptom_severity',
-      isRequired: false,
-    ),
-    DailyQuestion(
-      question: 'كيف كان شعورك العام اليوم؟',
-      hint: 'مثال: ممتاز / جيد / متوسط / سيء',
-      key: 'general_feeling',
-      isRequired: true,
-    ),
-    DailyQuestion(
-      question: 'هل هناك أي ملاحظات تريد إضافتها؟',
-      hint: 'مثال: لا توجد ملاحظات / تحسنت الأعراض / أحتاج استشارة',
-      key: 'notes',
-      isRequired: false,
-      maxLines: 3,
-    ),
-  ];
-
-  final Map<String, String> _dailyReportAnswers = {};
-  final Map<String, TextEditingController> _controllers = {};
+  // متغيرات التقرير والتحليل
   String _dailySummary = 'لم يتم إرسال تقرير اليوم بعد.';
   bool _reportSubmittedToday = false;
   bool _isLoading = false;
@@ -78,19 +30,6 @@ class DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    // إنشاء controllers لكل سؤال
-    for (var question in _dailyReportQuestions) {
-      _controllers[question.key] = TextEditingController();
-    }
-  }
-
-  @override
-  void dispose() {
-    // تنظيف controllers
-    for (var controller in _controllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
   }
 
   void addMedication(Medication medication) {
@@ -130,248 +69,32 @@ class DashboardPageState extends State<DashboardPage> {
     return time.hour * 60 + time.minute;
   }
 
+  // عرض نافذة التقرير
   void _showDailyReportDialog(BuildContext context) {
-    // إعادة تعيين الـ controllers إذا كان هذا تقرير جديد
-    if (!_reportSubmittedToday) {
-      for (var controller in _controllers.values) {
-        controller.clear();
-      }
-      _dailyReportAnswers.clear();
-    } else {
-      // ملء القيم السابقة إذا كان تحديث
-      for (var entry in _dailyReportAnswers.entries) {
-        if (_controllers.containsKey(entry.key)) {
-          _controllers[entry.key]!.text = entry.value;
-        }
-      }
-    }
-
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.summarize, color: AppTheme.primary),
-                const SizedBox(width: 8),
-                const Text('تقرير نهاية اليوم'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'ساعدنا في تحسين رعايتك الصحية من خلال مشاركة تجربتك اليومية',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // عرض الأدوية الحالية
-                  if (_medications.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'أدويتك اليوم:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          ..._medications.map(
-                            (med) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    med.isTaken
-                                        ? Icons.check_circle
-                                        : Icons.radio_button_unchecked,
-                                    color: med.isTaken
-                                        ? Colors.green
-                                        : Colors.grey,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      med.name,
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  ),
-                                  Text(
-                                    med.time.format(context),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // حقول الإدخال النصية
-                  ..._dailyReportQuestions.map((question) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  question.question,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              if (question.isRequired)
-                                const Text(
-                                  '*',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _controllers[question.key],
-                            maxLines: question.maxLines,
-                            decoration: InputDecoration(
-                              hintText: question.hint,
-                              hintStyle: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 13,
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: AppTheme.primary,
-                                  width: 2,
-                                ),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setDialogState(() {
-                                _dailyReportAnswers[question.key] = value;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Text('إلغاء'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  _submitDailyReport(context);
-                },
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('إرسال التقرير'),
-              ),
-            ],
-          );
+      barrierDismissible: false,
+      builder: (context) => DailyReportDialog(
+        onSubmit: (answers) {
+          _submitDailyReport(context, answers);
         },
       ),
     );
   }
 
-  Future<void> _submitDailyReport(BuildContext context) async {
-    // جمع الإجابات من الـ controllers
-    for (var entry in _controllers.entries) {
-      final text = entry.value.text.trim();
-      if (text.isNotEmpty) {
-        _dailyReportAnswers[entry.key] = text;
-      }
-    }
-
-    // التحقق من الإجابات الأساسية المطلوبة
-    bool hasEssentialAnswers = true;
-    List<String> missingFields = [];
-
-    for (var question in _dailyReportQuestions) {
-      if (question.isRequired) {
-        if (!_dailyReportAnswers.containsKey(question.key) ||
-            _dailyReportAnswers[question.key]!.isEmpty) {
-          hasEssentialAnswers = false;
-          missingFields.add('${question.question.substring(0, 30)}...');
-        }
-      }
-    }
-
-    if (!hasEssentialAnswers) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'يرجى الإجابة على الأسئلة المطلوبة (*): \n${missingFields.join('\n')}',
-          ),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
-
+  // ==========================================
+  // دالة إرسال التقرير
+  // ==========================================
+  Future<void> _submitDailyReport(
+    BuildContext context,
+    Map<String, dynamic> answers,
+  ) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // تحويل الأدوية إلى تنسيق مناسب للـ API
+      // 1. تحويل الأدوية لتنسيق الـ API
       final medicationsData = _medications
           .map(
             (med) => {
@@ -382,14 +105,16 @@ class DashboardPageState extends State<DashboardPage> {
           )
           .toList();
 
-      // إرسال التقرير إلى الـ API
+      // 2. إرسال التقرير مع تحويل نوع الإجابات إلى String بشكل صريح
       final response = await _apiService.analyzeDailyReport(
         userType: 'treatment',
         medications: medicationsData,
-        questionnaireAnswers: _dailyReportAnswers,
+        // التحويل هنا لتجنب خطأ Map<String, dynamic>
+        questionnaireAnswers: Map<String, String>.from(answers),
         userName: 'آدم',
       );
 
+      // 3. تحديث الواجهة بالنتيجة
       setState(() {
         _dailySummary = response.analysis;
         _recommendations = response.recommendations;
@@ -398,15 +123,16 @@ class DashboardPageState extends State<DashboardPage> {
         _reportSubmittedToday = true;
       });
 
-      Navigator.pop(context);
-
-      // عرض التحليل المفصل
-      _showDetailedAnalysis(context, response);
+      // 4. عرض التفاصيل في نافذة منبثقة
+      if (mounted) {
+        _showDetailedAnalysis(context, response);
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('خطأ في إرسال التقرير: $e'),
-          duration: const Duration(seconds: 3),
+          content: Text('حدث خطأ: $e'),
+          duration: const Duration(seconds: 4),
+          backgroundColor: Colors.red,
         ),
       );
     } finally {
@@ -429,14 +155,13 @@ class DashboardPageState extends State<DashboardPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header ثابت
+              // Header
               Container(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header مع الأيقونة والعنوان
                     Row(
                       children: [
                         Container(
@@ -467,7 +192,7 @@ class DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // درجة الصحة
+                    // Health Score Widget
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -528,7 +253,7 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
               ),
 
-              // المحتوى القابل للتمرير
+              // Scrollable Content
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -536,9 +261,6 @@ class DashboardPageState extends State<DashboardPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
-
-                      // التحليل
                       const Text(
                         '📊 التحليل',
                         style: TextStyle(
@@ -561,8 +283,6 @@ class DashboardPageState extends State<DashboardPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // التوصيات
                       const Text(
                         '💡 التوصيات',
                         style: TextStyle(
@@ -592,7 +312,7 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
               ),
 
-              // زر الإغلاق (ثابت في الأسفل)
+              // Close Button
               Container(
                 padding: const EdgeInsets.all(24),
                 child: Center(
@@ -608,10 +328,7 @@ class DashboardPageState extends State<DashboardPage> {
                         borderRadius: BorderRadius.circular(12),
                         onTap: () => Navigator.pop(context),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 12,
-                            horizontal: 24,
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           child: const Center(
                             child: Text(
                               'حسناً، فهمت',
@@ -693,9 +410,7 @@ class DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications, color: Colors.white),
-            onPressed: () {
-              // الانتقال للإشعارات
-            },
+            onPressed: () {},
           ),
         ],
       ),
@@ -705,7 +420,7 @@ class DashboardPageState extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ترحيب مختصر بعد إضافة AppBar
+              // Welcome Card
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -738,7 +453,7 @@ class DashboardPageState extends State<DashboardPage> {
               ),
               const SizedBox(height: 20),
 
-              // Today's Medications Card
+              // Today's Medications
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -784,7 +499,7 @@ class DashboardPageState extends State<DashboardPage> {
                       ),
                       const SizedBox(height: 20),
 
-                      // AI Summary Box مع تقرير اليوم
+                      // AI Summary Box
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(24),
@@ -809,7 +524,6 @@ class DashboardPageState extends State<DashboardPage> {
                             const SizedBox(height: 16),
 
                             if (_reportSubmittedToday) ...[
-                              // عرض درجة الصحة إذا كان هناك تقرير
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(16),
@@ -859,7 +573,6 @@ class DashboardPageState extends State<DashboardPage> {
                               const SizedBox(height: 16),
                             ],
 
-                            // إضافة تمرير للملخص في الصندوق الرئيسي
                             Container(
                               constraints: const BoxConstraints(maxHeight: 200),
                               padding: const EdgeInsets.all(16),
@@ -874,7 +587,6 @@ class DashboardPageState extends State<DashboardPage> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // التحليل
                                       const Text(
                                         '📊 التحليل:',
                                         style: TextStyle(
@@ -892,7 +604,6 @@ class DashboardPageState extends State<DashboardPage> {
                                             ?.copyWith(height: 1.5),
                                       ),
 
-                                      // التوصيات إذا كانت موجودة
                                       if (_recommendations.isNotEmpty &&
                                           _reportSubmittedToday) ...[
                                         const SizedBox(height: 16),
@@ -925,7 +636,7 @@ class DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 20),
 
-                            // زر تقرير اليومي
+                            // Report Button
                             Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
@@ -953,7 +664,7 @@ class DashboardPageState extends State<DashboardPage> {
                                           MainAxisAlignment.center,
                                       children: [
                                         if (_isLoading)
-                                          SizedBox(
+                                          const SizedBox(
                                             width: 20,
                                             height: 20,
                                             child: CircularProgressIndicator(
@@ -1070,19 +781,254 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// كلاس جديد لتمثيل الأسئلة مع حقول نصية
-class DailyQuestion {
-  final String question;
-  final String hint;
-  final String key;
-  final bool isRequired;
-  final int maxLines;
+// ==========================================
+// DailyReportDialog Widget (تصميم متناسق + شرطي)
+// ==========================================
 
-  DailyQuestion({
-    required this.question,
-    required this.hint,
-    required this.key,
-    this.isRequired = false,
-    this.maxLines = 1,
-  });
+class DailyReportDialog extends StatefulWidget {
+  final Function(Map<String, dynamic>) onSubmit;
+
+  const DailyReportDialog({Key? key, required this.onSubmit}) : super(key: key);
+
+  @override
+  State<DailyReportDialog> createState() => _DailyReportDialogState();
+}
+
+class _DailyReportDialogState extends State<DailyReportDialog> {
+  final Map<String, String> _answers = {};
+
+  // القائمة الكاملة للأسئلة
+  final List<Map<String, String>> _allQuestions = [
+    {
+      'key': 'adherence',
+      'text': '1. هل تمكنت من أخذ جميع جرعات الدواء في مواعيدها المحددة؟',
+    },
+    {
+      'key': 'improvement',
+      'text': '2. هل تشعر بتحسن ملحوظ في الأعراض مقارنة بالأمس؟',
+    },
+    {
+      'key': 'new_symptoms',
+      'text': '3. هل ظهرت عليك أي أعراض جديدة مفاجئة اليوم؟',
+    },
+    {
+      'key': 'pain_level',
+      'text': '4. هل كان مستوى الألم يمنعك من ممارسة نشاطك الطبيعي؟',
+    },
+    {
+      'key': 'vitals_normal',
+      'text': '5. هل كانت مؤشراتك الحيوية (ضغط/سكر) ضمن المعدل الطبيعي؟',
+    },
+    {
+      'key': 'sleep_quality',
+      'text': '6. هل حصلت على نوم متواصل ومريح الليلة الماضية؟',
+    },
+    {'key': 'appetite', 'text': '7. هل كانت شهيتك للطعام جيدة وطبيعية اليوم؟'},
+    {
+      'key': 'energy_level',
+      'text': '8. هل استطعت إكمال يومك دون الشعور بتعب أو إرهاق شديد؟',
+    },
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    // لون التطبيق الأساسي (الأزرق)
+    const primaryColor = Color(0xFF4A80F0);
+
+    // تصفية الأسئلة بناءً على الإجابات السابقة
+    final visibleQuestions = _allQuestions.where((q) {
+      if (q['key'] == 'pain_level') {
+        // سؤال الألم يظهر فقط إذا كانت الإجابة على "new_symptoms" (سؤال 3) هي "نعم"
+        return _answers['new_symptoms'] == 'نعم';
+      }
+      return true;
+    }).toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.white,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // رأس النافذة
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            decoration: BoxDecoration(
+              color: primaryColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.assignment_turned_in, color: primaryColor),
+                const SizedBox(width: 10),
+                const Text(
+                  "التقرير اليومي",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+
+          // قائمة الأسئلة المصفاة
+          Flexible(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(20),
+              shrinkWrap: true,
+              itemCount: visibleQuestions.length,
+              separatorBuilder: (ctx, i) => const Divider(height: 30),
+              itemBuilder: (context, index) {
+                final q = visibleQuestions[index];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      q['text']!,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildOptionBtn(
+                            "نعم",
+                            _answers[q['key']] == "نعم",
+                            () {
+                              setState(() {
+                                _answers[q['key']!] = "نعم";
+                                // إذا تم تغيير إجابة السؤال 3 إلى "نعم" ولكن كانت "لا" سابقاً، قد نحتاج تنظيف
+                                // (Logic is handled in 'No' case primarily)
+                              });
+                            },
+                            primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildOptionBtn(
+                            "لا",
+                            _answers[q['key']] == "لا",
+                            () {
+                              setState(() {
+                                _answers[q['key']!] = "لا";
+                                // إذا أجاب "لا" على سؤال 3، نحذف إجابة سؤال 4 لأنه سيختفي
+                                if (q['key'] == 'new_symptoms') {
+                                  _answers.remove('pain_level');
+                                }
+                              });
+                            },
+                            primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+          // زر الإرسال
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4A80F0), Color(0xFF9C27B0)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  // التحقق من الإجابة على جميع الأسئلة الظاهرة فقط
+                  bool allAnswered = visibleQuestions.every(
+                    (q) => _answers.containsKey(q['key']),
+                  );
+
+                  if (!allAnswered) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("يرجى الإجابة على جميع الأسئلة الظاهرة"),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context);
+                  widget.onSubmit(_answers);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  "إرسال التقرير",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptionBtn(
+    String text,
+    bool isSelected,
+    VoidCallback onTap,
+    Color activeColor,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : const Color(0xFFF5F7FA),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey[300]!,
+            width: 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: activeColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.grey[600],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
