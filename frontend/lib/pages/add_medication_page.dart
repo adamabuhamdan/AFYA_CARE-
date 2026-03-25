@@ -314,22 +314,6 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GradientButton(
-                                  text: 'استخدام هذا الاقتراح',
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('تم تطبيق الاقتراح'),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
                         ],
                       ),
                     ),

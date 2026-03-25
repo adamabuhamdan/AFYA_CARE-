@@ -6,8 +6,8 @@ import requests
 import os
 import time
 from dotenv import load_dotenv
-from embeddings import EmbeddingManager
-from pdf_processor import PDFProcessor
+from core.embeddings import EmbeddingManager
+from core.pdf_processor import PDFProcessor
 import asyncio
 import logging
 import json
@@ -113,8 +113,8 @@ async def startup_event():
         logger.error(f"خطأ في إعدادات البيئة: {env_message}")
         return
     
-    pdf_path = "medical_book.pdf"
-    db_filename = "medical_db"
+    pdf_path = "data/Medical_book.pdf"
+    db_filename = "database/medical_db"
     
     try:
         start_time = time.time()
@@ -153,7 +153,7 @@ async def startup_event():
             return
         
         # حفظ الأجزاء للمراجعة
-        processor.save_chunks("chunks_output.txt")
+        processor.save_chunks("data/chunks_output.txt")
         
         # إنشاء embeddings
         logger.info("جاري إنشاء embeddings وحفظ قاعدة البيانات...")
@@ -585,102 +585,381 @@ def _parse_ai_response(ai_response: str) -> tuple:
 
 @app.post("/analyze_questionnaire")
 async def analyze_questionnaire(request: QuestionnaireRequest):
-    """تحليل إجابات الاستبيان وإرجاع تحليل مخصص"""
+    """تحليل إجابات الاستبيان باستخدام الذكاء الاصطناعي"""
+    start_time = time.time()
+    
+    if not initialization_status["is_initialized"]:
+        raise HTTPException(
+            status_code=503, 
+            detail=initialization_status.get("message", "التطبيق قيد الإعداد. حاول لاحقاً")
+        )
+    
+    if not os.getenv('OPENROUTER_API_KEY'):
+        raise HTTPException(
+            status_code=500, 
+            detail="مفتاح OpenRouter API غير موجود. تأكد من إعداد ملف .env"
+        )
+    
     try:
-        analysis = generate_questionnaire_analysis(request.user_type, request.answers)
+        # بناء تحليل الأسئلة حسب نوع المستخدم
+        if request.user_type == "treatment":
+            analysis_prompt = _build_treatment_analysis_prompt(request.answers)
+        else:
+            analysis_prompt = _build_prevention_analysis_prompt(request.answers)
+        
+        # استدعاء الذكاء الاصطناعي للحصول على تحليل متكامل
+        api_start = time.time()
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                    "HTTP-Referer": "http://localhost:8000",
+                    "X-Title": "AFYA CARE - Questionnaire Analysis",
+                },
+                json={
+                    "model": "gpt-3.5-turbo",
+                    "messages": analysis_prompt,
+                    "temperature": 0.3,
+                    "max_tokens": 1500,
+                    "top_p": 0.9,
+                },
+                timeout=45
+            )
+            
+            api_time = time.time() - api_start
+            logger.info(f"📄 استجابة API للاستبيان في {api_time:.2f} ثانية - الحالة: {response.status_code}")
+            
+            if response.status_code != 200:
+                error_detail = "خطأ غير معروف"
+                if response.text:
+                    try:
+                        error_data = response.json()
+                        error_detail = error_data.get('error', {}).get('message', response.text[:200])
+                    except:
+                        error_detail = response.text[:200]
+                
+                logger.error(f"❌ خطأ من OpenRouter API: {error_detail}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"خطأ في خدمة الذكاء الاصطناعي: {error_detail}"
+                )
+            
+            response_data = response.json()
+            
+            if not response_data.get("choices") or not response_data["choices"]:
+                raise HTTPException(status_code=500, detail="استجابة فارغة من خدمة الذكاء الاصطناعي")
+            
+            ai_analysis = response_data["choices"][0]["message"]["content"]
+            
+        except requests.exceptions.Timeout:
+            logger.error("⏰ انتهت مهلة الاتصال بـ OpenRouter API")
+            raise HTTPException(status_code=504, detail="انتهت مهلة الاتصال بخدمة الذكاء الاصطناعي")
+        except requests.exceptions.ConnectionError:
+            logger.error("🔌 خطأ في الاتصال بـ OpenRouter API")
+            raise HTTPException(status_code=503, detail="تعذر الاتصال بخدمة الذكاء الاصطناعي")
+        
+        # إنشاء رسالة ترحيب مخصصة بناءً على نوع المستخدم
+        welcome_message = _generate_welcome_message(request.user_type, request.answers)
+        
+        total_time = time.time() - start_time
+        
+        logger.info(f"✅ تم تحليل الاستبيان في {total_time:.2f} ثانية - نوع المستخدم: {request.user_type}")
         
         return {
-            "analysis": analysis,
-            "personalized_advice": generate_personalized_advice(request.user_type, request.answers),
-            "welcome_message": generate_welcome_message(request.user_type)
+            "analysis": ai_analysis,
+            "personalized_advice": _generate_personalized_advice(request.user_type, request.answers),
+            "welcome_message": welcome_message,
+            "processing_time": total_time
         }
     
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"خطأ في تحليل الاستبيان: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"خطأ في تحليل الاستبيان: {str(e)}")
+        logger.error(f"💥 خطأ غير متوقع في تحليل الاستبيان: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"خطأ داخلي في المعالجة: {str(e)}"
+        )
 
-def generate_questionnaire_analysis(user_type: str, answers: dict):
-    """إنشاء تحليل مخصص بناءً على إجابات الاستبيان"""
+def _build_treatment_analysis_prompt(answers: dict):
+    """بناء رسالة تحليل العلاج باستخدام الذكاء الاصطناعي"""
+    
+    questions_text = ""
+    for key, answer in answers.items():
+        question_text = ""
+        if key == 'adherence':
+            question_text = "هل تناولت جميع أدويتك اليوم حسب الجدول؟"
+        elif key == 'reason':
+            question_text = "هل كان سبب عدم تناول الدواء هو النسيان؟"
+        elif key == 'side_effects':
+            question_text = "هل واجهت أي أعراض جانبية اليوم؟"
+        elif key == 'symptom_severity':
+            question_text = "هل كانت الأعراض شديدة وتؤثر على نشاطك اليومي؟"
+        elif key == 'general_feeling':
+            question_text = "هل تشعر بتحسن عام في صحتك اليوم؟"
+        else:
+            question_text = key
+        
+        questions_text += f"• {question_text}: {answer}\n"
+    
+    return [
+        {
+            "role": "system",
+            "content": """أنت مساعد طبي ذكي متخصص في تحليل تقارير المرضى اليومية.
+
+🎯 **المهمة**: تحليل إجابات المريض عن حالته العلاجية اليومية وإعطاء:
+1. تحليل مفصل للحالة
+2. نصائح مخصصة
+3. رسالة ترحيب ملهمة
+
+📝 **أسلوب التحليل**:
+1. حلل كل إجابة بشكل منفصل
+2. اربط الإجابات معاً للحصول على صورة شاملة
+3. قدم تحليلاً واقعياً وبنّاءً
+4. كن داعماً ومشجعاً
+5. ركز على التقدم والتحسين
+
+⚠️ **تحذيرات هامة**:
+- أنت نظام ذكي وليس بديلاً عن الطبيب
+- لا تقدم تشخيصات طبية
+- ركز على التوعية والنصائح العامة
+- كن حذراً عند الحديث عن الأدوية"""
+        },
+        {
+            "role": "user",
+            "content": f"""**إجابات المريض عن حالته العلاجية اليومية:**
+
+{questions_text}
+
+**الطلب:**
+قم بتحليل هذه الإجابات وأعطني:
+1. تحليل مفصل للحالة (ما يقارب 300 كلمة)
+2. نصائح مخصصة بناءً على الإجابات
+3. رسالة ترحيب ملهمة تبدأ بـ "مرحباً! أنا مساعدك الصحي..."
+
+**تأكد من:**
+- اللغة: العربية الفصحى الواضحة
+- الأسلوب: داعم، بنّاء، مشجع
+- التركيز: على التحسين والتقدم
+- عدم تقديم تشخيصات طبية"""
+        }
+    ]
+
+def _build_prevention_analysis_prompt(answers: dict):
+    """بناء رسالة تحليل الوقاية باستخدام الذكاء الاصطناعي"""
+    
+    questions_text = ""
+    for key, answer in answers.items():
+        question_text = ""
+        if key == 'sleep':
+            question_text = "ما هو نمط نومك؟"
+        elif key == 'exercise':
+            question_text = "كم مرة تمارس الرياضة أسبوعياً؟"
+        elif key == 'diet':
+            question_text = "كيف تصف نظامك الغذائي؟"
+        elif key == 'habits':
+            question_text = "هل تدخن أو تتناول الكحول؟"
+        elif key == 'family_history':
+            question_text = "هل لديك تاريخ عائلي لأمراض مزمنة؟"
+        else:
+            question_text = key
+        
+        questions_text += f"• {question_text}: {answer}\n"
+    
+    return [
+        {
+            "role": "system",
+            "content": """أنت خبير صحي متخصص في الوقاية والعناية الصحية.
+
+🎯 **المهمة**: تحليل العادات الصحية للمستخدم وإعطاء:
+1. تقييم للصحة العامة
+2. نصائح وقائية مخصصة
+3. رسالة ترحيب ملهمة
+
+🏆 **مبادئ التقييم**:
+- تقييم شامل للعادات الصحية
+- تقدير نقاط القوة والضعف
+- اقتراح تحسينات عملية
+- التركيز على الوقاية
+
+🌿 **مجالات التقييم**:
+1. النوم وجودته
+2. النشاط البدني
+3. النظام الغذائي
+4. العادات الصحية
+5. التاريخ العائلي
+
+⚠️ **تحذيرات هامة**:
+- أنت نظام توجيهي وليس تشخيصي
+- المعلومات لأغراض التوعية فقط
+- شجع على الفحوصات الدورية"""
+        },
+        {
+            "role": "user",
+            "content": f"""**عادات المستخدم الصحية:**
+
+{questions_text}
+
+**الطلب:**
+قم بتحليل هذه العادات الصحية وأعطني:
+1. تقييم شامل للصحة العامة (ما يقارب 300 كلمة)
+2. نصائح وقائية مخصصة بناءً على الإجابات
+3. رسالة ترحيب ملهمة تبدأ بـ "مرحباً! أنا مساعدك الصحي..."
+
+**تأكد من:**
+- اللغة: العربية الفصحى الواضحة
+- الأسلوب: إيجابي، مشجع، بنّاء
+- التركيز: على الوقاية والحياة الصحية
+- ربط العادات بالصحة العامة"""
+        }
+    ]
+
+def _generate_welcome_message(user_type: str, answers: dict = None):
+    """إنشاء رسالة ترحيب مخصصة باستخدام الذكاء الاصطناعي"""
     
     if user_type == "treatment":
-        return _analyze_treatment_questionnaire(answers)
+        base_message = "مرحباً! أنا مساعدك الصحي. كيف يمكنني مساعدتك في متابعة علاجك اليوم؟ 💊"
     else:
-        return _analyze_prevention_questionnaire(answers)
+        base_message = "مرحباً! أنا مساعدك الصحي. كيف يمكنني مساعدتك في الحفاظ على صحتك؟ 🌿"
+    
+    # إذا كان هناك إجابات، يمكن تخصيص الرسالة أكثر
+    if answers:
+        try:
+            # استخدام الذكاء الاصطناعي لتخصيص الرسالة بناءً على الإجابات
+            api_start = time.time()
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                    "HTTP-Referer": "http://localhost:8000",
+                    "X-Title": "AFYA CARE - Welcome Message",
+                },
+                json={
+                    "model": "gpt-3.5-turbo",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "أنت مساعد صحي ودود. اكتب رسالة ترحيب قصيرة ومشجعة للمريض بناءً على إجاباته."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"""اكتب رسالة ترحيب قصيرة (سطر أو سطرين) لمستخدم {'تحت العلاج' if user_type == 'treatment' else 'يهتم بالوقاية'}.
+                            
+رسالة البداية: {base_message}
+المستخدم: {'تحت العلاج' if user_type == 'treatment' else 'مهتم بالصحة'}
+                            
+تأكد أن الرسالة:
+1. ودودة ومشجعة
+2. قصيرة (سطر أو سطرين)
+3. تحتوي على أيقونة مناسبة
+4. مكتوبة بالعربية"""
+                        }
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 100,
+                    "top_p": 0.9,
+                },
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                response_data = response.json()
+                if response_data.get("choices") and response_data["choices"]:
+                    custom_message = response_data["choices"][0]["message"]["content"]
+                    logger.info(f"✅ رسالة ترحيب مخصصة في {time.time() - api_start:.2f} ثانية")
+                    return custom_message
+                    
+        except Exception as e:
+            logger.warning(f"⚠️ لم يتم تخصيص رسالة الترحيب: {e}")
+    
+    return base_message
 
-def _analyze_treatment_questionnaire(answers: dict):
-    """تحليل استبيان العلاج"""
-    analysis = "تحليل حالتك العلاجية:\n\n"
+def _generate_personalized_advice(user_type: str, answers: dict):
+    """إنشاء نصائح مخصصة باستخدام الذكاء الاصطناعي"""
     
-    # تحليل الالتزام بالعلاج
-    adherence = answers.get('adherence', '')
-    if 'جميع الأدوية' in adherence:
-        analysis += "• التزامك بالعلاج ممتاز، استمر على هذا النحو\n"
-    elif 'معظم الأدوية' in adherence:
-        analysis += "• مستوى الالتزام جيد ولكن يمكن تحسينه\n"
-    else:
-        analysis += "• تحتاج لتحسين الالتزام بالعلاج للوصول للنتائج المثلى\n"
-    
-    # تحليل الأعراض الجانبية
-    side_effects = answers.get('side_effects', '')
-    if 'لا توجد أعراض' not in side_effects:
-        analysis += "• هناك أعراض جانبية تحتاج للمتابعة\n"
-    
-    # تحليل الحالة العامة
-    general_feeling = answers.get('general_feeling', '')
-    if 'سيء' in general_feeling:
-        analysis += "• حالتك العامة تحتاج للمراجعة مع الطبيب\n"
-    
-    return analysis
+    try:
+        # استخدام الذكاء الاصطناعي لإنشاء نصائح مخصصة
+        advice_type = "علاجية" if user_type == "treatment" else "وقائية"
+        
+        api_start = time.time()
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "AFYA CARE - Personalized Advice",
+            },
+            json={
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": f"""أنت خبير صحي متخصص في تقديم نصائح {advice_type} مخصصة.
 
-def _analyze_prevention_questionnaire(answers: dict):
-    """تحليل استبيان الوقاية"""
-    analysis = "تحليل صحتك العامة:\n\n"
-    
-    # تحليل النشاط البدني
-    exercise = answers.get('exercise', '')
-    if 'لا أمارس' in exercise:
-        analysis += "• تحتاج لزيادة النشاط البدني\n"
-    elif '3-4 مرات' in exercise or 'يومياً' in exercise:
-        analysis += "• مستوى النشاط البدني ممتاز\n"
-    
-    # تحليل النظام الغذائي
-    diet = answers.get('diet', '')
-    if 'غير صحي' in diet:
-        analysis += "• النظام الغذائي يحتاج للتحسين\n"
-    elif 'صحي جداً' in diet:
-        analysis += "• النظام الغذائي ممتاز\n"
-    
-    # تحليل التوتر
-    stress = answers.get('stress', '')
-    if 'مرتفع' in stress:
-        analysis += "• إدارة التوتر مهمة لصحتك\n"
-    
-    return analysis
+🎯 **المهمة**: إنشاء قائمة نصائح مخصصة بناءً على إجابات المستخدم.
 
-def generate_personalized_advice(user_type: str, answers: dict):
-    """إنشاء نصائح مخصصة بناءً على الإجابات"""
+📝 **تنسيق النصائح**:
+- ابدأ بعنوان "نصائح {advice_type} مخصصة:"
+- اكتب 3-5 نقاط رئيسية
+- كل نقطة تبدأ برمز من الرموز التالية: • 🔹 ⭐ 💡 ✅
+- ركز على النقاط العملية والقابلة للتطبيق
+- كن مباشراً وواضحاً
+
+⚠️ **تحذيرات**:
+- لا تقدم نصائح طبية محددة
+- لا توصي بأدوية معينة
+- ركز على العادات والتوجيهات العامة"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""أنشئ قائمة نصائح {advice_type} مخصصة.
+
+نوع المستخدم: {'مريض تحت العلاج' if user_type == 'treatment' else 'شخص يهتم بالوقاية'}
+
+إجابات المستخدم:
+{json.dumps(answers, ensure_ascii=False, indent=2)}
+
+المتطلبات:
+- اكتب باللغة العربية
+- 3-5 نقاط رئيسية فقط
+- كل نقطة في سطر منفصل
+- ركز على الإجراءات العملية
+- استخدم رموز مناسبة"""
+                    }
+                ],
+                "temperature": 0.4,
+                "max_tokens": 300,
+                "top_p": 0.9,
+            },
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            if response_data.get("choices") and response_data["choices"]:
+                ai_advice = response_data["choices"][0]["message"]["content"]
+                logger.info(f"✅ نصائح مخصصة في {time.time() - api_start:.2f} ثانية")
+                return ai_advice
+                    
+    except Exception as e:
+        logger.warning(f"⚠️ لم يتم إنشاء نصائح مخصصة: {e}")
     
+    # النصائح الافتراضية في حال فشل الذكاء الاصطناعي
     if user_type == "treatment":
         return """نصائح علاجية مخصصة:
-• التزم بمواعيد الأدوية بدقة
-• سجل أي أعراض جانبية تواجهها
-• حافظ على مواعيد المتابعة مع الطبيب
-• اشرب كمية كافية من الماء
-• احصل على قسط كاف من الراحة"""
+• 💊 التزم بمواعيد أدويتك بدقة
+• 📝 سجل أي أعراض جانبية تواجهها
+• 🩺 حافظ على مواعيد المتابعة مع طبيبك
+• 💧 اشرب 8 أكواب ماء يومياً
+• 😴 احصل على قسط كافٍ من النوم والراحة"""
     else:
         return """نصائح وقائية مخصصة:
-• مارس الرياضة 30 دقيقة يومياً
-• تناول 5 حصص من الخضار والفواكه
-• اشرب 8 أكواب ماء يومياً
-• نم 7-8 ساعات ليلاً
-• أجري فحوصات دورية سنوياً"""
-
-def generate_welcome_message(user_type: str):
-    """إنشاء رسالة ترحيب مخصصة"""
-    if user_type == "treatment":
-        return "مرحباً! أنا مساعدك الصحي. كيف يمكنني مساعدتك في متابعة علاجك اليوم? 💊"
-    else:
-        return "مرحباً! أنا مساعدك الصحي. كيف يمكنني مساعدتك في الحفاظ على صحتك؟ 🌿"
+• 🏃 مارس الرياضة 30 دقيقة يومياً
+• 🍎 تناول 5 حصص من الخضار والفواكه
+• 💧 اشرب 8 أكواب ماء يومياً
+• 😴 نم 7-8 ساعات ليلاً
+• 🩺 أجري فحوصات دورية سنوياً"""
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):

@@ -120,15 +120,16 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     try {
-      // جمع الإجابات
+      // جمع الإجابات بشكل صحيح
       Map<String, String> answers = {};
+
       for (var question in _currentQuestions) {
         if (question.selectedAnswer != null) {
           answers[question.key] = question.selectedAnswer!;
         }
       }
 
-      // إرسال الاستبيان للخلفية
+      // إرسال الاستبيان للخلفية الجديدة
       final response = await _apiService.analyzeQuestionnaire(
         userType: _isUnderTreatment ? 'treatment' : 'prevention',
         answers: answers,
@@ -139,13 +140,13 @@ class _ChatPageState extends State<ChatPage> {
         _isLoading = false;
       });
 
-      // إضافة رسالة الترحيب من الخلفية
+      // إضافة رسالة الترحيب من الذكاء الاصطناعي
       _addMessage(response['welcome_message'], false);
 
-      // إضافة التحليل
+      // إضافة التحليل من الذكاء الاصطناعي
       _addMessage(response['analysis'], false);
 
-      // إضافة النصائح
+      // إضافة النصائح المخصصة
       _addMessage(response['personalized_advice'], false);
     } catch (e) {
       setState(() {

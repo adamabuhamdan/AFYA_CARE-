@@ -49,6 +49,38 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  // دالة جديدة لحذف الدواء
+  void _deleteMedication(String id) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف الدواء'),
+        content: const Text('هل أنت متأكد من حذف هذا الدواء؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _medications.removeWhere((med) => med.id == id);
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('تم حذف الدواء بنجاح'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('حذف', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Medication? _getNextMedication() {
     final now = TimeOfDay.now();
     final upcoming = _medications
@@ -488,11 +520,8 @@ class DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 16),
                             ..._medications.map(
-                              (medication) => MedicationCard(
-                                medication: medication,
-                                onToggle: () =>
-                                    _toggleMedicationStatus(medication.id),
-                              ),
+                              (medication) =>
+                                  _buildMedicationCardWithDelete(medication),
                             ),
                           ],
                         ),
@@ -777,6 +806,40 @@ class DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
+    );
+  }
+
+  // دالة جديدة لبناء بطاقة الدواء مع زر الحذف
+  Widget _buildMedicationCardWithDelete(Medication medication) {
+    return Stack(
+      children: [
+        MedicationCard(
+          medication: medication,
+          onToggle: () => _toggleMedicationStatus(medication.id),
+        ),
+        Positioned(
+          top: 10,
+          left: 10,
+          child: GestureDetector(
+            onTap: () => _deleteMedication(medication.id),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.9),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 16),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
